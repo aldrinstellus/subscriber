@@ -1,0 +1,297 @@
+// Subscriber - Subscription Tracking Application
+// Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String?
+  avatar        String?
+  currency      String         @default("USD")
+  timezone      String         @default("UTC")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  subscriptions Subscription[]
+  accounts      Account[]
+  categories    Category[]
+  notifications NotificationSettings?
+  importHistory ImportHistory[]
+
+  @@map("users")
+}
+
+// ============================================
+// SUBSCRIPTIONS
+// ============================================
+
+model Subscription {
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  name            String
+  description     String?
+  logoUrl         String?
+  websiteUrl      String?
+
+  // Billing
+  cost            Decimal            @db.Decimal(10, 2)
+  currency        String             @default("USD")
+  billingCycle    BillingCycle
+  billingDay      Int?               // Day of month/week for billing
+
+  // Dates
+  startDate       DateTime
+  endDate         DateTime?          // For cancelled/expired
+  nextBillingDate DateTime?
+  trialEndDate    DateTime?
+
+  // Status
+  status          SubscriptionStatus @default(ACTIVE)
+  autoRenew       Boolean            @default(true)
+
+  // Organization
+  categoryId      String?
+  category        Category?          @relation(fields: [categoryId], references: [id])
+  accountId       String?
+  account         Account?           @relation(fields: [accountId], references: [id])
+
+  // Sharing
+  isShared        Boolean            @default(false)
+  sharedWith      Json?              // Array of {name, email, splitAmount}
+
+  // Source tracking
+  source          DataSource         @default(MANUAL)
+  sourceId        String?            // External reference ID
+
+  // Metadata
+  notes           String?
+  tags            String[]
+  customFields    Json?
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  priceHistory    PriceHistory[]
+  reminders       Reminder[]
+
+  @@index([userId, status])
+  @@index([nextBillingDate])
+  @@map("subscriptions")
+}
+
+// ============================================
+// CATEGORIES & ACCOUNTS
+// ============================================
+
+model Category {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name          String
+  icon          String?
+  color         String?
+  budget        Decimal?       @db.Decimal(10, 2)
+
+  subscriptions Subscription[]
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([userId, name])
+  @@map("categories")
+}
+
+model Account {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name          String         // e.g., "Personal Gmail", "Work Account"
+  email         String?
+  type          AccountType
+
+  subscriptions Subscription[]
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([userId, name])
+  @@map("accounts")
+}
+
+// ============================================
+// PRICE HISTORY & REMINDERS
+// ============================================
+
+model PriceHistory {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  previousCost   Decimal      @db.Decimal(10, 2)
+  newCost        Decimal      @db.Decimal(10, 2)
+  changedAt      DateTime     @default(now())
+  source         DataSource   @default(MANUAL)
+
+  @@index([subscriptionId, changedAt])
+  @@map("price_history")
+}
+
+model Reminder {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  daysBefore     Int          @default(3)
+  channel        ReminderChannel
+  enabled        Boolean      @default(true)
+  lastSentAt     DateTime?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([subscriptionId, daysBefore, channel])
+  @@map("reminders")
+}
+
+// ============================================
+// NOTIFICATION SETTINGS
+// ============================================
+
+model NotificationSettings {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailEnabled          Boolean  @default(true)
+  pushEnabled           Boolean  @default(false)
+  renewalReminders      Boolean  @default(true)
+  priceChangeAlerts     Boolean  @default(true)
+  weeklyDigest          Boolean  @default(false)
+  monthlyReport         Boolean  @default(true)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("notification_settings")
+}
+
+// ============================================
+// IMPORT HISTORY
+// ============================================
+
+model ImportHistory {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  source      DataSource
+  filename    String?
+  status      ImportStatus
+  itemsFound  Int          @default(0)
+  itemsAdded  Int          @default(0)
+  errors      Json?
+
+  startedAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  @@map("import_history")
+}
+
+// ============================================
+// SERVICE DATABASE (for autocomplete/matching)
+// ============================================
+
+model ServiceDatabase {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  aliases      String[]
+  logoUrl      String?
+  websiteUrl   String?
+  category     String?
+  typicalCost  Decimal? @db.Decimal(10, 2)
+  billingCycle BillingCycle?
+
+  // Matching patterns
+  emailDomains String[]
+  merchantNames String[]
+  urlPatterns  String[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([name])
+  @@map("service_database")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum BillingCycle {
+  FREE
+  TRIAL
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  BIANNUAL
+  YEARLY
+  LIFETIME
+  CUSTOM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  EXPIRED
+  TRIAL
+  PENDING
+}
+
+enum DataSource {
+  MANUAL
+  EMAIL
+  BROWSER
+  BANK_IMPORT
+  PLAID
+  API
+}
+
+enum AccountType {
+  PERSONAL
+  WORK
+  FAMILY
+  OTHER
+}
+
+enum ReminderChannel {
+  EMAIL
+  PUSH
+  SMS
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
