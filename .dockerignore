@@ -1,0 +1,84 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+.next
+**/.next
+build
+**/build
+
+# Development files
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files (use Docker secrets or env vars instead)
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+coverage
+**/coverage
+.nyc_output
+**/.nyc_output
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+**/__tests__
+__mocks__
+**/__mocks__
+
+# Documentation
+*.md
+!README.md
+docs
+LICENSE
+
+# Misc
+.turbo
+**/.turbo
+.vercel
+**/.vercel
+.cache
+**/.cache
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Docker compose files (not needed in image)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Railway/Vercel configs
+railway.json
+railway.toml
+vercel.json

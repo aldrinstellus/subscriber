@@ -8,6 +8,7 @@ import { authRouter } from './routes/auth';
 import { subscriptionRouter } from './routes/subscriptions';
 import { categoryRouter } from './routes/categories';
 import { analyticsRouter } from './routes/analytics';
+import { exportRouter } from './routes/export';
 
 // Load environment variables
 dotenv.config();
@@ -33,6 +34,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/subscriptions', subscriptionRouter);
 app.use('/api/categories', categoryRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/export', exportRouter);
 
 // Error handling
 app.use(errorHandler);

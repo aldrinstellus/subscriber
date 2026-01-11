@@ -1,15 +1,22 @@
-import { useQuery } from '@tanstack/react-query';
-import { CreditCard, Search, Filter } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { CreditCard, Search, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { subscriptionsApi, categoriesApi } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import SubscriptionForm from '../components/SubscriptionForm';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 export default function Subscriptions() {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const currencySymbol = user?.currency === 'USD' ? '$' : user?.currency;
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+
+  // Modal states
+  const [editingSubscription, setEditingSubscription] = useState<any>(null);
+  const [deletingSubscription, setDeletingSubscription] = useState<any>(null);
 
   const { data: subscriptions, isLoading } = useQuery({
     queryKey: ['subscriptions', statusFilter, categoryFilter],
@@ -27,9 +34,34 @@ export default function Subscriptions() {
     queryFn: () => categoriesApi.list().then((res) => res.data.data),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => subscriptionsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      setDeletingSubscription(null);
+    },
+  });
+
   const filteredSubs = subscriptions?.items?.filter((sub: any) =>
     sub.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleEdit = (sub: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSubscription(sub);
+  };
+
+  const handleDelete = (sub: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingSubscription(sub);
+  };
+
+  const confirmDelete = () => {
+    if (deletingSubscription) {
+      deleteMutation.mutate(deletingSubscription.id);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -89,7 +121,7 @@ export default function Subscriptions() {
           {filteredSubs.map((sub: any) => (
             <div
               key={sub.id}
-              className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer"
+              className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -140,6 +172,24 @@ export default function Subscriptions() {
                   </p>
                 )}
               </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+                <button
+                  onClick={(e) => handleEdit(sub, e)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit
+                </button>
+                <button
+                  onClick={(e) => handleDelete(sub, e)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -155,6 +205,26 @@ export default function Subscriptions() {
               : 'Add your first subscription to get started'}
           </p>
         </div>
+      )}
+
+      {/* Edit Subscription Modal */}
+      {editingSubscription && (
+        <SubscriptionForm
+          subscription={editingSubscription}
+          onClose={() => setEditingSubscription(null)}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingSubscription && (
+        <DeleteConfirmModal
+          title="Delete Subscription"
+          message="Are you sure you want to delete this subscription? This action cannot be undone."
+          itemName={deletingSubscription.name}
+          isLoading={deleteMutation.isPending}
+          onConfirm={confirmDelete}
+          onClose={() => setDeletingSubscription(null)}
+        />
       )}
     </div>
   );
