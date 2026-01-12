@@ -32,24 +32,10 @@
 - **Fix**: Added `console.error` statements for Supabase auth errors
 - **Status**: DONE (code committed)
 
-## Pending Fixes
-
-### 1. Vercel Environment Variables Have Trailing Newlines
-- **Issue**: `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` have `\n` at the end, breaking authentication
-- **Impact**: API returns "Authentication failed" on all authenticated requests
-- **Fix Required**:
-```bash
-# Remove and re-add SUPABASE_URL
-vercel env rm SUPABASE_URL production --yes
-echo "https://focqhiwagkajfubuyufk.supabase.co" | vercel env add SUPABASE_URL production
-
-# Remove and re-add SUPABASE_SERVICE_ROLE_KEY
-vercel env rm SUPABASE_SERVICE_ROLE_KEY production --yes
-echo "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvY3FoaXdhZ2thamZ1YnV5dWZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODE5ODIxNywiZXhwIjoyMDgzNzc0MjE3fQ.jg8T59bYSgbE_CI9c-E79OgspR-zpvrF3x43trzBiM0" | vercel env add SUPABASE_SERVICE_ROLE_KEY production
-
-# Redeploy
-vercel deploy --prod
-```
+### 7. Vercel Environment Variables Fixed
+- **Issue**: `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` had trailing `\n` breaking authentication
+- **Fix**: Removed and re-added env vars without trailing newlines, redeployed
+- **Status**: DONE
 
 ## Files Modified
 
