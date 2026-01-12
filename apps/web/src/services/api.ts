@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from '../lib/supabase';
 
 const api = axios.create({
   baseURL: '/api',
@@ -7,20 +8,11 @@ const api = axios.create({
   },
 });
 
-// Token will be set by ClerkTokenProvider
-let getTokenFn: (() => Promise<string | null>) | null = null;
-
-export const setTokenGetter = (fn: () => Promise<string | null>) => {
-  getTokenFn = fn;
-};
-
-// Add auth token to requests
+// Add Supabase auth token to requests
 api.interceptors.request.use(async (config) => {
-  if (getTokenFn) {
-    const token = await getTokenFn();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
   }
   return config;
 });
@@ -43,10 +35,9 @@ export const authApi = {
   disconnectAccount: (accountId: string) => api.delete(`/auth/disconnect/${accountId}`),
 };
 
-
 // User API
 export const userApi = {
-  getMe: () => api.get('/user/me'),
+  getMe: () => api.get('/auth/me'),
   updateSettings: (data: { currency?: string; timezone?: string; name?: string }) =>
     api.patch('/user/settings', data),
   completeOnboarding: () => api.post('/user/complete-onboarding'),
@@ -59,7 +50,7 @@ export const subscriptionsApi = {
     api.get('/subscriptions', { params }),
   get: (id: string) => api.get(`/subscriptions/${id}`),
   create: (data: any) => api.post('/subscriptions', data),
-  update: (id: string, data: any) => api.patch(`/subscriptions/${id}`, data),
+  update: (id: string, data: any) => api.put(`/subscriptions/${id}`, data),
   delete: (id: string) => api.delete(`/subscriptions/${id}`),
 };
 
@@ -68,7 +59,7 @@ export const categoriesApi = {
   list: () => api.get('/categories'),
   create: (data: { name: string; icon?: string; color?: string }) =>
     api.post('/categories', data),
-  update: (id: string, data: any) => api.patch(`/categories/${id}`, data),
+  update: (id: string, data: any) => api.put(`/categories/${id}`, data),
   delete: (id: string) => api.delete(`/categories/${id}`),
 };
 
