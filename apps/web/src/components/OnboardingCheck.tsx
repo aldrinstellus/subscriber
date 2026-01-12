@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from './AuthProvider';
 import { userApi } from '../services/api';
 
 export function OnboardingCheck({ children }: { children: React.ReactNode }) {

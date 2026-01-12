@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { User, Bell, Download, Trash2 } from 'lucide-react';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from '../components/AuthProvider';
 import { CURRENCIES } from 'shared';
 import { userApi } from '../services/api';
 

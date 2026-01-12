@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from '../components/AuthProvider';
 import { Mail, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { userApi, authApi } from '../services/api';
 

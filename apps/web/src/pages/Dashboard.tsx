@@ -7,7 +7,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { analyticsApi, subscriptionsApi } from '../services/api';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from '../components/AuthProvider';
 
 function StatCard({
   label,
