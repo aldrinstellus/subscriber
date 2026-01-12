@@ -1,5 +1,10 @@
 # Claude Code Instructions
 
+## Execution Style
+- Autonomous execution - don't ask for permissions, just get it done
+- Full spectrum automated testing until perfect
+- Iterate: check, refactor, improve until flawless
+
 ## Browser Automation
 - Maximum ONE browser instance at a time
 - Prefer non-browser methods (MCP tools, CLI, APIs) over browser automation
