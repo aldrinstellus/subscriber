@@ -11,6 +11,8 @@ out/
 .env
 .env.local
 .env.*.local
+apps/*/.env
+apps/*/.env.*
 
 # Database
 *.db
@@ -48,3 +50,4 @@ prisma/*.db-journal
 *.tsbuildinfo
 
 .vercel
+.env*.local

@@ -91,8 +91,8 @@ subscriptionRouter.post('/', async (req: AuthRequest, res, next) => {
         ...rest,
         userId: req.userId!,
         cost: data.cost,
-        sharedWith: sharedWith ? JSON.stringify(sharedWith) : null,
-        tags: tags && tags.length > 0 ? JSON.stringify(tags) : null,
+        sharedWith: sharedWith ? sharedWith.map(s => JSON.stringify(s)) : undefined,
+        tags: tags && tags.length > 0 ? tags : undefined,
       },
       include: {
         category: true,
@@ -131,14 +131,14 @@ subscriptionRouter.patch('/:id', async (req: AuthRequest, res, next) => {
       });
     }
 
-    // Serialize arrays to JSON strings for Prisma (SQLite stores as string)
+    // Serialize arrays for Prisma
     const { sharedWith, tags, ...rest } = data;
     const updateData: any = { ...rest };
     if (sharedWith !== undefined) {
-      updateData.sharedWith = sharedWith ? JSON.stringify(sharedWith) : null;
+      updateData.sharedWith = sharedWith ? sharedWith.map((s: any) => JSON.stringify(s)) : [];
     }
     if (tags !== undefined) {
-      updateData.tags = tags && tags.length > 0 ? JSON.stringify(tags) : null;
+      updateData.tags = tags && tags.length > 0 ? tags : [];
     }
 
     const subscription = await prisma.subscription.update({
