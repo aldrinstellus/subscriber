@@ -17,13 +17,29 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Handle auth errors
+// Handle auth errors with retry for cold start issues
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Retry once on 401 (handles serverless cold start)
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      // Check if user has a valid session
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session?.access_token) {
+        // User is signed in, retry the request
+        originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
+        return api(originalRequest);
+      }
+
+      // No session, redirect to sign-in
       window.location.href = '/sign-in';
     }
+
     return Promise.reject(error);
   }
 );

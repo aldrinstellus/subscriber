@@ -52,7 +52,13 @@ const authenticate = async (
     // Verify token with Supabase
     const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
 
-    if (error || !supabaseUser) {
+    if (error) {
+      console.error('Supabase auth error:', error.message);
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    if (!supabaseUser) {
+      console.error('No user returned from Supabase');
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
@@ -214,12 +220,25 @@ app.get('/api/auth/me', authenticate, async (req: AuthRequest, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
-      select: { id: true, email: true, name: true, currency: true, timezone: true },
+      select: { id: true, email: true, name: true, currency: true, timezone: true, onboardingCompleted: true },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ success: true, data: user });
   } catch {
     res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+// User routes
+app.post('/api/user/complete-onboarding', authenticate, async (req: AuthRequest, res) => {
+  try {
+    await prisma.user.update({
+      where: { id: req.userId },
+      data: { onboardingCompleted: true },
+    });
+    res.json({ success: true, data: { onboardingCompleted: true } });
+  } catch {
+    res.status(500).json({ error: 'Failed to complete onboarding' });
   }
 });
 
