@@ -61,7 +61,7 @@ userRouter.patch('/settings', async (req: AuthRequest, res, next) => {
 // Complete onboarding
 userRouter.post('/complete-onboarding', async (req: AuthRequest, res, next) => {
   try {
-    const user = await prisma.user.update({
+    await prisma.user.update({
       where: { id: req.userId },
       data: { onboardingCompleted: true },
     });

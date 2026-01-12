@@ -18,7 +18,7 @@ function calculateMonthlyEquivalent(cost: number, billingCycle: string): number 
 
 function calculateNextBillingDate(startDate: Date, billingCycle: string): Date {
   const now = new Date();
-  let nextDate = new Date(startDate);
+  const nextDate = new Date(startDate);
 
   while (nextDate <= now) {
     switch (billingCycle) {
