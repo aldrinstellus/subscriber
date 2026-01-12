@@ -99,7 +99,7 @@ export default function Layout() {
             </div>
             <ChevronDown
               size={16}
-              className={\`text-gray-400 transition-transform \${showUserMenu ? 'rotate-180' : ''}\`}
+              className={`text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`}
             />
           </button>
 
