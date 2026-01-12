@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 
@@ -23,14 +23,14 @@ app.use(express.json());
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
 // Auth middleware
-interface AuthRequest extends express.Request {
+interface AuthRequest extends Request {
   userId?: string;
 }
 
 const authenticate = async (
   req: AuthRequest,
-  res: express.Response,
-  next: express.NextFunction
+  res: Response,
+  next: NextFunction
 ) => {
   try {
     const authHeader = req.headers.authorization;
