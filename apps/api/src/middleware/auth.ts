@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { clerkClient, getAuth } from '@clerk/express';
 import { AppError } from './errorHandler';
 import { prisma } from '../services/prisma';
+import { verifySupabaseToken } from '../services/supabase';
 
 export interface AuthRequest extends Request {
   userId?: string;
-  clerkUserId?: string;
+  supabaseUserId?: string;
 }
 
 export const authenticate = async (
@@ -14,23 +14,31 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
-    const auth = getAuth(req);
-
-    if (!auth.userId) {
-      throw new AppError(401, 'Unauthorized');
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new AppError(401, 'Unauthorized - No token provided');
+    }
+    
+    const token = authHeader.split(' ')[1];
+    
+    // Verify token with Supabase
+    const supabaseUser = await verifySupabaseToken(token);
+    
+    if (!supabaseUser) {
+      throw new AppError(401, 'Unauthorized - Invalid token');
     }
 
-    req.clerkUserId = auth.userId;
+    req.supabaseUserId = supabaseUser.id;
 
     // Find or create user in our database
     let user = await prisma.user.findUnique({
-      where: { clerkId: auth.userId },
+      where: { supabaseId: supabaseUser.id },
     });
 
     if (!user) {
-      // Get user details from Clerk
-      const clerkUser = await clerkClient.users.getUser(auth.userId);
-      const email = clerkUser.emailAddresses[0]?.emailAddress;
+      const email = supabaseUser.email;
       
       if (!email) {
         throw new AppError(400, 'No email associated with account');
@@ -42,19 +50,19 @@ export const authenticate = async (
       });
 
       if (user) {
-        // Link existing user to Clerk
+        // Link existing user to Supabase
         user = await prisma.user.update({
           where: { id: user.id },
-          data: { clerkId: auth.userId },
+          data: { supabaseId: supabaseUser.id },
         });
       } else {
         // Create new user
         user = await prisma.user.create({
           data: {
-            clerkId: auth.userId,
+            supabaseId: supabaseUser.id,
             email,
-            name: clerkUser.fullName || clerkUser.firstName || null,
-            avatar: clerkUser.imageUrl,
+            name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || null,
+            avatar: supabaseUser.user_metadata?.avatar_url || null,
           },
         });
 

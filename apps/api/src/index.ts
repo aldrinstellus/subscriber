@@ -2,7 +2,6 @@ import express, { type Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { clerkMiddleware } from '@clerk/express';
 
 import { errorHandler } from './middleware/errorHandler';
 import { subscriptionRouter } from './routes/subscriptions';
@@ -21,13 +20,10 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || ['http://localhost:5173', 'http://localhost:5174'],
+  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true,
 }));
 app.use(express.json());
-
-// Clerk middleware - must be before routes
-app.use(clerkMiddleware());
 
 // Health check
 app.get('/health', (req, res) => {
@@ -47,7 +43,7 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Subscriber API running on http://localhost:${PORT}`);
+  console.log(\`Subscriber API running on http://localhost:\${PORT}\`);
 });
 
 export default app;

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useUser, useClerk } from '@clerk/clerk-react';
+import { useUser, useClerk } from './AuthProvider';
 import {
   LayoutDashboard,
   CreditCard,
@@ -22,7 +22,7 @@ const navItems = [
 
 export default function Layout() {
   const { user } = useUser();
-  const { signOut, openUserProfile } = useClerk();
+  const { signOut } = useClerk();
   const navigate = useNavigate();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -49,11 +49,6 @@ export default function Layout() {
   const handleSignOut = async () => {
     await signOut();
     navigate('/sign-in');
-  };
-
-  const handleOpenProfile = () => {
-    openUserProfile();
-    setShowUserMenu(false);
   };
 
   return (
@@ -104,19 +99,12 @@ export default function Layout() {
             </div>
             <ChevronDown
               size={16}
-              className={`text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`}
+              className={\`text-gray-400 transition-transform \${showUserMenu ? 'rotate-180' : ''}\`}
             />
           </button>
 
           {showUserMenu && (
             <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-              <button
-                onClick={handleOpenProfile}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <User size={18} />
-                <span>Profile</span>
-              </button>
               <NavLink
                 to="/settings"
                 onClick={() => setShowUserMenu(false)}

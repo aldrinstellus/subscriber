@@ -1,18 +1,18 @@
 // Subscriber - Subscription Tracking Application
-// Database Schema (SQLite for local development)
+// Database Schema (PostgreSQL via Supabase)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 model User {
   id                  String         @id @default(cuid())
-  clerkId             String?        @unique
+  supabaseId          String?        @unique
   email               String         @unique
   passwordHash        String?
   name                String?
@@ -65,7 +65,7 @@ model Subscription {
   logoUrl         String?
   websiteUrl      String?
 
-  cost            Float
+  cost            Decimal            @db.Decimal(10, 2)
   currency        String             @default("USD")
   billingCycle    String             @default("MONTHLY")
   billingDay      Int?
@@ -84,13 +84,13 @@ model Subscription {
   account         Account?           @relation(fields: [accountId], references: [id])
 
   isShared        Boolean            @default(false)
-  sharedWith      String?
+  sharedWith      String[]
 
   source          String             @default("MANUAL")
   sourceId        String?
 
   notes           String?
-  tags            String?
+  tags            String[]
 
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
@@ -105,14 +105,13 @@ model Subscription {
 
 model Category {
   id            String         @id @default(cuid())
-  clerkId       String?        @unique
   userId        String
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   name          String
   icon          String?
   color         String?
-  budget        Float?
+  budget        Decimal?       @db.Decimal(10, 2)
 
   subscriptions Subscription[]
 
@@ -125,7 +124,6 @@ model Category {
 
 model Account {
   id            String         @id @default(cuid())
-  clerkId       String?        @unique
   userId        String
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -147,8 +145,8 @@ model PriceHistory {
   subscriptionId String
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
-  previousCost   Float
-  newCost        Float
+  previousCost   Decimal      @db.Decimal(10, 2)
+  newCost        Decimal      @db.Decimal(10, 2)
   changedAt      DateTime     @default(now())
   source         String       @default("MANUAL")
 
@@ -212,16 +210,16 @@ model ImportHistory {
 model ServiceDatabase {
   id           String   @id @default(cuid())
   name         String   @unique
-  aliases      String?
+  aliases      String[]
   logoUrl      String?
   websiteUrl   String?
   category     String?
-  typicalCost  Float?
+  typicalCost  Decimal? @db.Decimal(10, 2)
   billingCycle String?
 
-  emailDomains  String?
-  merchantNames String?
-  urlPatterns   String?
+  emailDomains  String[]
+  merchantNames String[]
+  urlPatterns   String[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

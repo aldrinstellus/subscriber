@@ -1,13 +1,108 @@
-import { useEffect } from 'react';
-import { useAuth } from '@clerk/clerk-react';
-import { setTokenGetter } from '../services/api';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { getToken } = useAuth();
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setTokenGetter(getToken);
-  }, [getToken]);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
-  return <>{children}</>;
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error: error as Error | null };
+  };
+
+  const signUp = async (email: string, password: string, name?: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: name },
+      },
+    });
+    return { error: error as Error | null };
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const signInWithGoogle = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
+// Compatibility hooks for components expecting Clerk-like API
+export function useUser() {
+  const { user, loading } = useAuth();
+  return {
+    user: user ? {
+      id: user.id,
+      fullName: user.user_metadata?.full_name || user.email?.split('@')[0],
+      primaryEmailAddress: { emailAddress: user.email },
+      imageUrl: user.user_metadata?.avatar_url,
+    } : null,
+    isLoaded: !loading,
+    isSignedIn: !!user,
+  };
+}
+
+export function useClerk() {
+  const { signOut } = useAuth();
+  return {
+    signOut,
+    openUserProfile: () => {
+      // Supabase doesn't have a built-in profile UI
+      // Could navigate to a settings page instead
+    },
+  };
 }

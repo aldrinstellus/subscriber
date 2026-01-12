@@ -25,12 +25,15 @@ export function OnboardingCheck({ children }: { children: React.ReactNode }) {
       try {
         const response = await userApi.getMe();
         const user = response.data.data;
-        
-        if (!user.onboardingCompleted) {
+
+        // Redirect to onboarding if not completed or user doesn't exist yet
+        if (!user || !user.onboardingCompleted) {
           navigate('/onboarding');
         }
       } catch (error) {
         console.error('Failed to check onboarding status:', error);
+        // On error, redirect to onboarding (safer default for new users)
+        navigate('/onboarding');
       } finally {
         setChecking(false);
       }
