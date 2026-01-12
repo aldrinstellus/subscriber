@@ -3,14 +3,24 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { createClient } from '@supabase/supabase-js';
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 
 // Initialize Prisma
 const prisma = new PrismaClient();
+
+// Initialize Supabase Admin Client
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
 
 // Initialize Express
 const app = express();
@@ -20,12 +30,10 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-
 // Auth middleware
 interface AuthRequest extends Request {
   userId?: string;
+  supabaseUserId?: string;
 }
 
 const authenticate = async (
@@ -40,11 +48,72 @@ const authenticate = async (
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-    req.userId = decoded.userId;
+
+    // Verify token with Supabase
+    const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !supabaseUser) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    req.supabaseUserId = supabaseUser.id;
+
+    // Find or create user in our database
+    let user = await prisma.user.findUnique({
+      where: { supabaseId: supabaseUser.id },
+    });
+
+    if (!user) {
+      const email = supabaseUser.email;
+
+      if (!email) {
+        return res.status(400).json({ error: 'No email associated with account' });
+      }
+
+      // Check if user exists by email (migration from old auth)
+      user = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (user) {
+        // Link existing user to Supabase
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { supabaseId: supabaseUser.id },
+        });
+      } else {
+        // Create new user
+        user = await prisma.user.create({
+          data: {
+            supabaseId: supabaseUser.id,
+            email,
+            name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || null,
+          },
+        });
+
+        // Create default categories for new user
+        const defaultCategories = [
+          { name: 'Streaming', icon: 'tv', color: '#ef4444' },
+          { name: 'Music', icon: 'music', color: '#22c55e' },
+          { name: 'Software', icon: 'code', color: '#3b82f6' },
+          { name: 'Gaming', icon: 'gamepad-2', color: '#8b5cf6' },
+          { name: 'Other', icon: 'box', color: '#6b7280' },
+        ];
+
+        await prisma.category.createMany({
+          data: defaultCategories.map((cat) => ({
+            ...cat,
+            userId: user!.id,
+          })),
+        });
+      }
+    }
+
+    req.userId = user.id;
     next();
-  } catch {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  } catch (err) {
+    console.error('Auth error:', err);
+    return res.status(401).json({ error: 'Authentication failed' });
   }
 };
 
