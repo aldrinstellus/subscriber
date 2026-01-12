@@ -1,9 +1,9 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { BILLING_CYCLE_MONTHS } from 'shared';
+import { BILLING_CYCLE_MONTHS } from '../../../../packages/shared/dist';
 
-export const analyticsRouter = Router();
+export const analyticsRouter: RouterType = Router();
 
 // All routes require authentication
 analyticsRouter.use(authenticate);

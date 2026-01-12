@@ -1,10 +1,10 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import { prisma } from '../services/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { createCategorySchema, updateCategorySchema } from 'shared';
+import { createCategorySchema, updateCategorySchema } from '../../../../packages/shared/dist';
 
-export const categoryRouter = Router();
+export const categoryRouter: RouterType = Router();
 
 // All routes require authentication
 categoryRouter.use(authenticate);
@@ -53,7 +53,7 @@ categoryRouter.patch('/:id', async (req: AuthRequest, res, next) => {
 
     // Verify ownership
     const existing = await prisma.category.findFirst({
-      where: { id: req.params.id, userId: req.userId },
+      where: { id: (req.params.id as string), userId: req.userId },
     });
 
     if (!existing) {
@@ -61,7 +61,7 @@ categoryRouter.patch('/:id', async (req: AuthRequest, res, next) => {
     }
 
     const category = await prisma.category.update({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) },
       data,
     });
 
@@ -76,7 +76,7 @@ categoryRouter.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
     // Verify ownership
     const existing = await prisma.category.findFirst({
-      where: { id: req.params.id, userId: req.userId },
+      where: { id: (req.params.id as string), userId: req.userId },
     });
 
     if (!existing) {
@@ -85,12 +85,12 @@ categoryRouter.delete('/:id', async (req: AuthRequest, res, next) => {
 
     // Move subscriptions to uncategorized
     await prisma.subscription.updateMany({
-      where: { categoryId: req.params.id },
+      where: { categoryId: (req.params.id as string) },
       data: { categoryId: null },
     });
 
     await prisma.category.delete({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) },
     });
 
     res.json({ success: true, message: 'Category deleted' });

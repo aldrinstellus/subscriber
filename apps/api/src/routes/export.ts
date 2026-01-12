@@ -1,8 +1,8 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
-export const exportRouter = Router();
+export const exportRouter: RouterType = Router();
 
 // All routes require authentication
 exportRouter.use(authenticate);

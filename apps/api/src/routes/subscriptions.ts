@@ -1,10 +1,10 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import { prisma } from '../services/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { createSubscriptionSchema, updateSubscriptionSchema } from 'shared';
+import { createSubscriptionSchema, updateSubscriptionSchema } from '../../../../packages/shared/dist';
 
-export const subscriptionRouter = Router();
+export const subscriptionRouter: RouterType = Router();
 
 // All routes require authentication
 subscriptionRouter.use(authenticate);
@@ -55,7 +55,7 @@ subscriptionRouter.get('/:id', async (req: AuthRequest, res, next) => {
   try {
     const subscription = await prisma.subscription.findFirst({
       where: {
-        id: req.params.id,
+        id: req.params.id as string,
         userId: req.userId,
       },
       include: {
@@ -84,11 +84,15 @@ subscriptionRouter.post('/', async (req: AuthRequest, res, next) => {
   try {
     const data = createSubscriptionSchema.parse(req.body);
 
+    // Serialize arrays to JSON strings for Prisma (SQLite stores as string)
+    const { sharedWith, tags, ...rest } = data;
     const subscription = await prisma.subscription.create({
       data: {
-        ...data,
+        ...rest,
         userId: req.userId!,
         cost: data.cost,
+        sharedWith: sharedWith ? JSON.stringify(sharedWith) : null,
+        tags: tags && tags.length > 0 ? JSON.stringify(tags) : null,
       },
       include: {
         category: true,
@@ -109,7 +113,7 @@ subscriptionRouter.patch('/:id', async (req: AuthRequest, res, next) => {
 
     // Verify ownership
     const existing = await prisma.subscription.findFirst({
-      where: { id: req.params.id, userId: req.userId },
+      where: { id: req.params.id as string, userId: req.userId },
     });
 
     if (!existing) {
@@ -127,9 +131,19 @@ subscriptionRouter.patch('/:id', async (req: AuthRequest, res, next) => {
       });
     }
 
+    // Serialize arrays to JSON strings for Prisma (SQLite stores as string)
+    const { sharedWith, tags, ...rest } = data;
+    const updateData: any = { ...rest };
+    if (sharedWith !== undefined) {
+      updateData.sharedWith = sharedWith ? JSON.stringify(sharedWith) : null;
+    }
+    if (tags !== undefined) {
+      updateData.tags = tags && tags.length > 0 ? JSON.stringify(tags) : null;
+    }
+
     const subscription = await prisma.subscription.update({
-      where: { id: req.params.id },
-      data,
+      where: { id: req.params.id as string },
+      data: updateData,
       include: {
         category: true,
         account: true,
@@ -147,7 +161,7 @@ subscriptionRouter.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
     // Verify ownership
     const existing = await prisma.subscription.findFirst({
-      where: { id: req.params.id, userId: req.userId },
+      where: { id: req.params.id as string, userId: req.userId },
     });
 
     if (!existing) {
@@ -155,7 +169,7 @@ subscriptionRouter.delete('/:id', async (req: AuthRequest, res, next) => {
     }
 
     await prisma.subscription.delete({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
     });
 
     res.json({ success: true, message: 'Subscription deleted' });

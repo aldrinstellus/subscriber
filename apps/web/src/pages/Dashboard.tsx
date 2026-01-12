@@ -7,7 +7,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { analyticsApi, subscriptionsApi } from '../services/api';
-import { useAuthStore } from '../stores/authStore';
+import { useUser } from '@clerk/clerk-react';
 
 function StatCard({
   label,
@@ -36,8 +36,8 @@ function StatCard({
 }
 
 export default function Dashboard() {
-  const { user } = useAuthStore();
-  const currencySymbol = user?.currency === 'USD' ? '$' : user?.currency;
+  const { user } = useUser();
+  const currencySymbol = '$';
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['analytics', 'summary'],
@@ -62,7 +62,7 @@ export default function Dashboard() {
       {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          Welcome back{user?.name ? `, ${user.name}` : ''}!
+          Welcome back{user?.fullName || user?.firstName ? `, ${user.firstName}` : ''}!
         </h1>
         <p className="text-gray-500">Here's your subscription overview</p>
       </div>

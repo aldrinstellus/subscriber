@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { useAuthStore } from '../stores/authStore';
 
 const api = axios.create({
   baseURL: '/api',
@@ -8,11 +7,20 @@ const api = axios.create({
   },
 });
 
+// Token will be set by ClerkTokenProvider
+let getTokenFn: (() => Promise<string | null>) | null = null;
+
+export const setTokenGetter = (fn: () => Promise<string | null>) => {
+  getTokenFn = fn;
+};
+
 // Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.request.use(async (config) => {
+  if (getTokenFn) {
+    const token = await getTokenFn();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
   }
   return config;
 });
@@ -22,8 +30,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
+      window.location.href = '/sign-in';
     }
     return Promise.reject(error);
   }
@@ -31,11 +38,19 @@ api.interceptors.response.use(
 
 // Auth API
 export const authApi = {
-  register: (data: { email: string; password: string; name?: string }) =>
-    api.post('/auth/register', data),
-  login: (data: { email: string; password: string }) =>
-    api.post('/auth/login', data),
-  getMe: () => api.get('/auth/me'),
+  getGmailOAuthUrl: () => api.post('/auth/gmail/url'),
+  getOutlookOAuthUrl: () => api.post('/auth/outlook/url'),
+  disconnectAccount: (accountId: string) => api.delete(`/auth/disconnect/${accountId}`),
+};
+
+
+// User API
+export const userApi = {
+  getMe: () => api.get('/user/me'),
+  updateSettings: (data: { currency?: string; timezone?: string; name?: string }) =>
+    api.patch('/user/settings', data),
+  completeOnboarding: () => api.post('/user/complete-onboarding'),
+  getConnectedAccounts: () => api.get('/user/connected-accounts'),
 };
 
 // Subscriptions API
