@@ -1,6 +1,7 @@
 import { Router, type Router as RouterType } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { triggerEmailScan } from '../services/emailScanner';
 
 export const userRouter: RouterType = Router();
 
@@ -88,8 +89,47 @@ userRouter.get('/connected-accounts', async (req: AuthRequest, res, next) => {
       },
     });
 
-    res.json({ success: true, data: accounts });
+    res.json({ success: true, data: { accounts } });
   } catch (error) {
+    next(error);
+  }
+});
+
+// Scan connected email accounts for subscriptions
+userRouter.post('/scan-emails', async (req: AuthRequest, res, next) => {
+  try {
+    const userId = req.userId!;
+
+    // Check if user has connected accounts
+    const accounts = await prisma.connectedAccount.findMany({
+      where: { userId, status: 'ACTIVE' },
+    });
+
+    if (accounts.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          message: 'No connected email accounts found. Please connect Gmail or Outlook first.',
+          results: [],
+        },
+      });
+    }
+
+    // Trigger scan
+    const { results } = await triggerEmailScan(userId);
+
+    const totalFound = results.reduce((sum, r) => sum + r.found, 0);
+    const totalAdded = results.reduce((sum, r) => sum + r.added, 0);
+
+    res.json({
+      success: true,
+      data: {
+        message: `Scanned ${accounts.length} account(s). Found ${totalFound} subscriptions, added ${totalAdded} new.`,
+        results,
+      },
+    });
+  } catch (error) {
+    console.error('Email scan error:', error);
     next(error);
   }
 });

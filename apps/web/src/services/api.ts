@@ -58,6 +58,7 @@ export const userApi = {
     api.patch('/user/settings', data),
   completeOnboarding: () => api.post('/user/complete-onboarding'),
   getConnectedAccounts: () => api.get('/user/connected-accounts'),
+  scanEmails: () => api.post('/user/scan-emails'),
 };
 
 // Subscriptions API

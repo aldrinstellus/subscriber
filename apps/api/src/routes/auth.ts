@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { prisma } from '../services/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { scanGmailForSubscriptions } from '../services/emailScanner';
 
 export const authRouter: RouterType = Router();
 
@@ -63,11 +64,17 @@ authRouter.get('/gmail/callback', async (req: Request, res: Response) => {
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const { data: userInfo } = await oauth2.userinfo.get();
     if (!userInfo.email) throw new Error('No email');
-    await prisma.connectedAccount.upsert({
+    const account = await prisma.connectedAccount.upsert({
       where: { userId_provider_email: { userId, provider: 'GMAIL', email: userInfo.email } },
       update: { accessToken: tokens.access_token, refreshToken: tokens.refresh_token || undefined, tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null, scopes: GMAIL_SCOPES.join(' '), status: 'ACTIVE' },
       create: { userId, provider: 'GMAIL', email: userInfo.email, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null, scopes: GMAIL_SCOPES.join(' '), status: 'ACTIVE' },
     });
+
+    // Trigger email scan in background (don't wait for it)
+    scanGmailForSubscriptions(userId, account.id).catch(err => {
+      console.error('Background email scan failed:', err);
+    });
+
     res.redirect(frontendUrl + '/onboarding?connected=gmail');
   } catch (error) {
     console.error('Gmail callback error:', error);
