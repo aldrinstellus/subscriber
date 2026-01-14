@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@azure/msal-node':
+        specifier: ^3.8.4
+        version: 3.8.4
       '@prisma/client':
         specifier: ^6.2.0
         version: 6.19.1(prisma@6.19.1(typescript@5.9.3))(typescript@5.9.3)
@@ -26,6 +29,9 @@ importers:
       express:
         specifier: ^4.21.2
         version: 4.22.1
+      googleapis:
+        specifier: ^170.0.0
+        version: 170.0.0
       helmet:
         specifier: ^8.0.0
         version: 8.1.0

@@ -39,7 +39,7 @@ export const authenticate = async (
 
     if (!user) {
       const email = supabaseUser.email;
-      
+
       if (!email) {
         throw new AppError(400, 'No email associated with account');
       }
@@ -50,10 +50,14 @@ export const authenticate = async (
       });
 
       if (user) {
-        // Link existing user to Supabase
+        // Link existing user to Supabase and sync profile
         user = await prisma.user.update({
           where: { id: user.id },
-          data: { supabaseId: supabaseUser.id },
+          data: {
+            supabaseId: supabaseUser.id,
+            name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || user.name,
+            avatar: supabaseUser.user_metadata?.avatar_url || user.avatar,
+          },
         });
       } else {
         // Create new user
@@ -80,6 +84,20 @@ export const authenticate = async (
             ...cat,
             userId: user!.id,
           })),
+        });
+      }
+    } else {
+      // Existing user - sync avatar from Supabase if available
+      const newAvatar = supabaseUser.user_metadata?.avatar_url;
+      const newName = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name;
+
+      if ((newAvatar && newAvatar !== user.avatar) || (newName && newName !== user.name)) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            avatar: newAvatar || user.avatar,
+            name: newName || user.name,
+          },
         });
       }
     }

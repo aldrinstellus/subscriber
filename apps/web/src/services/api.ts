@@ -53,7 +53,7 @@ export const authApi = {
 
 // User API
 export const userApi = {
-  getMe: () => api.get('/auth/me'),
+  getMe: () => api.get('/user/me'),
   updateSettings: (data: { currency?: string; timezone?: string; name?: string }) =>
     api.patch('/user/settings', data),
   completeOnboarding: () => api.post('/user/complete-onboarding'),

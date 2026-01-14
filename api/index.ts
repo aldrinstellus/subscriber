@@ -4,6 +4,8 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { createClient } from '@supabase/supabase-js';
+import { google } from 'googleapis';
+import { ConfidentialClientApplication } from '@azure/msal-node';
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
@@ -226,6 +228,150 @@ app.get('/api/auth/me', authenticate, async (req: AuthRequest, res) => {
     res.json({ success: true, data: user });
   } catch {
     res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+// OAuth helper functions
+const getGoogleOAuthClient = () => {
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI || 'https://subscriber-gilt.vercel.app/api/auth/gmail/callback'
+  );
+};
+
+const getMsalClient = () => {
+  return new ConfidentialClientApplication({
+    auth: {
+      clientId: process.env.MICROSOFT_CLIENT_ID || '',
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET || '',
+      authority: 'https://login.microsoftonline.com/common',
+    },
+  });
+};
+
+const GMAIL_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/userinfo.email',
+];
+
+const MICROSOFT_SCOPES = ['Mail.Read', 'User.Read', 'offline_access'];
+
+// Gmail OAuth URL
+app.post('/api/auth/gmail/url', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const oauth2Client = getGoogleOAuthClient();
+    const state = Buffer.from(JSON.stringify({ userId: req.userId })).toString('base64');
+    const authUrl = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: GMAIL_SCOPES,
+      state,
+      prompt: 'consent',
+    });
+    res.json({ success: true, url: authUrl });
+  } catch (error) {
+    console.error('Gmail OAuth URL error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate OAuth URL' });
+  }
+});
+
+// Gmail OAuth callback
+app.get('/api/auth/gmail/callback', async (req: Request, res: Response) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://subscriber-gilt.vercel.app';
+  try {
+    const { code, state } = req.query;
+    if (!code || typeof code !== 'string') throw new Error('No code');
+    const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+    const userId = stateData.userId;
+    const oauth2Client = getGoogleOAuthClient();
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const { data: userInfo } = await oauth2.userinfo.get();
+    if (!userInfo.email) throw new Error('No email');
+    await prisma.connectedAccount.upsert({
+      where: { userId_provider_email: { userId, provider: 'GMAIL', email: userInfo.email } },
+      update: { accessToken: tokens.access_token, refreshToken: tokens.refresh_token || undefined, tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null, scopes: GMAIL_SCOPES.join(' '), status: 'ACTIVE' },
+      create: { userId, provider: 'GMAIL', email: userInfo.email, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null, scopes: GMAIL_SCOPES.join(' '), status: 'ACTIVE' },
+    });
+    res.redirect(frontendUrl + '/onboarding?connected=gmail');
+  } catch (error) {
+    console.error('Gmail callback error:', error);
+    res.redirect(frontendUrl + '/onboarding?error=gmail_callback_failed');
+  }
+});
+
+// Outlook OAuth URL
+app.post('/api/auth/outlook/url', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const msalClient = getMsalClient();
+    const state = Buffer.from(JSON.stringify({ userId: req.userId })).toString('base64');
+    const authUrl = await msalClient.getAuthCodeUrl({
+      scopes: MICROSOFT_SCOPES,
+      redirectUri: process.env.MICROSOFT_REDIRECT_URI || 'https://subscriber-gilt.vercel.app/api/auth/outlook/callback',
+      state,
+    });
+    res.json({ success: true, url: authUrl });
+  } catch (error) {
+    console.error('Outlook OAuth URL error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate OAuth URL' });
+  }
+});
+
+// Outlook OAuth callback
+app.get('/api/auth/outlook/callback', async (req: Request, res: Response) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://subscriber-gilt.vercel.app';
+  try {
+    const { code, state } = req.query;
+    if (!code || typeof code !== 'string') throw new Error('No code');
+    const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+    const userId = stateData.userId;
+    const msalClient = getMsalClient();
+    const tokenResponse = await msalClient.acquireTokenByCode({
+      code,
+      scopes: MICROSOFT_SCOPES,
+      redirectUri: process.env.MICROSOFT_REDIRECT_URI || 'https://subscriber-gilt.vercel.app/api/auth/outlook/callback',
+    });
+    if (!tokenResponse?.account?.username) throw new Error('No email');
+    const email = tokenResponse.account.username;
+    await prisma.connectedAccount.upsert({
+      where: { userId_provider_email: { userId, provider: 'OUTLOOK', email } },
+      update: { accessToken: tokenResponse.accessToken, tokenExpiry: tokenResponse.expiresOn || null, scopes: MICROSOFT_SCOPES.join(' '), status: 'ACTIVE' },
+      create: { userId, provider: 'OUTLOOK', email, accessToken: tokenResponse.accessToken, tokenExpiry: tokenResponse.expiresOn || null, scopes: MICROSOFT_SCOPES.join(' '), status: 'ACTIVE' },
+    });
+    res.redirect(frontendUrl + '/onboarding?connected=outlook');
+  } catch (error) {
+    console.error('Outlook callback error:', error);
+    res.redirect(frontendUrl + '/onboarding?error=outlook_callback_failed');
+  }
+});
+
+// Get connected accounts
+app.get('/api/user/connected-accounts', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const accounts = await prisma.connectedAccount.findMany({
+      where: { userId: req.userId },
+      select: { id: true, provider: true, email: true, status: true, createdAt: true },
+    });
+    res.json({ success: true, data: accounts });
+  } catch (error) {
+    console.error('Get connected accounts error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch connected accounts' });
+  }
+});
+
+// Disconnect account
+app.delete('/api/auth/disconnect/:accountId', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const accountId = req.params.accountId as string;
+    const userId = req.userId!;
+    const account = await prisma.connectedAccount.findFirst({ where: { id: accountId, userId } });
+    if (!account) return res.status(404).json({ success: false, error: 'Not found' });
+    await prisma.connectedAccount.delete({ where: { id: accountId } });
+    res.json({ success: true, message: 'Disconnected' });
+  } catch (error) {
+    console.error('Disconnect error:', error);
+    res.status(500).json({ success: false, error: 'Failed' });
   }
 });
 

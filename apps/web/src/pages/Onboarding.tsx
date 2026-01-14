@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../components/AuthProvider';
 import { Mail, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { userApi, authApi } from '../services/api';
@@ -9,8 +9,44 @@ type Step = 'welcome' | 'connect' | 'complete';
 export default function Onboarding() {
   const { user } = useUser();
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>('welcome');
-  const [connectedAccounts] = useState<string[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Check URL params for OAuth callback - compute initial state
+  const oauthCallback = useMemo(() => {
+    const connected = searchParams.get('connected');
+    return connected === 'gmail' || connected === 'outlook' ? connected : null;
+  }, [searchParams]);
+
+  const [step, setStep] = useState<Step>(() => oauthCallback ? 'connect' : 'welcome');
+  const [connectedAccounts, setConnectedAccounts] = useState<string[]>(() =>
+    oauthCallback ? [oauthCallback] : []
+  );
+
+  // Clear URL parameter after OAuth callback
+  useEffect(() => {
+    if (oauthCallback) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [oauthCallback, setSearchParams]);
+
+  // Fetch existing connected accounts on mount
+  useEffect(() => {
+    const fetchConnectedAccounts = async () => {
+      try {
+        const response = await userApi.getConnectedAccounts();
+        if (response.data?.accounts) {
+          const providers = response.data.accounts.map((acc: { provider: string }) => acc.provider.toLowerCase());
+          setConnectedAccounts(prev => {
+            const combined = [...new Set([...prev, ...providers])];
+            return combined;
+          });
+        }
+      } catch {
+        // Ignore errors - user may not have any connected accounts
+      }
+    };
+    fetchConnectedAccounts();
+  }, []);
 
   const handleConnectGmail = async () => {
     try {

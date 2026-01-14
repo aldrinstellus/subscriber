@@ -11,20 +11,29 @@
 - Always close browser when done
 - Never use multiple browser tools (playwright, chrome-devtools) in parallel
 
-## Project Info
-- **Stack:** React + Vite frontend, Express API, Prisma ORM, Supabase (Auth + PostgreSQL)
-- **Package Manager:** pnpm (monorepo with Turborepo)
-- **Deployment:** Vercel (auto-deploys from master branch)
-- **Live URL:** https://subscriber-gilt.vercel.app
+## Important Notes
+- API code lives in `/api/index.ts` (Vercel serverless entry point)
+- Frontend API calls go through `/apps/web/src/services/api.ts`
+- Shared types/validation in `/packages/shared/`
+- Always run `pnpm build` before committing to catch TypeScript errors
+- Use Session Pooler (port 5432) with `?pgbouncer=true` for Supabase (NOT Transaction Pooler port 6543)
 
-## Development
+## Quick Commands
 ```bash
-pnpm dev          # Start dev servers (frontend :5173, API :3001)
-pnpm build        # Production build
-pnpm prisma studio # Database GUI
+pnpm dev              # Frontend :5173, API :3001
+pnpm build            # Production build (required before commit)
+pnpm prisma studio    # Database GUI
+pnpm prisma db push   # Push schema changes
 ```
 
-## Environment Files
-- `/.env` - Root (DATABASE_URL, Supabase credentials)
-- `/apps/web/.env` - Frontend (VITE_SUPABASE_*)
-- `/apps/api/.env` - Backend API
+## Documentation
+- `context.md` - Full project context (WHAT, WHY, HOW)
+- `agent_docs/` - Detailed documentation
+  - `architecture.md` - System design
+  - `api-reference.md` - API endpoints
+  - `troubleshooting.md` - Common issues
+- `DEVELOPMENT_PLAN.md` - Feature roadmap
+
+## Live URLs
+- **App:** https://subscriber-gilt.vercel.app
+- **Supabase:** https://supabase.com/dashboard/project/focqhiwagkajfubuyufk

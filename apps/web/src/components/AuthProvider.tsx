@@ -1,15 +1,28 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { userApi } from '../services/api';
+
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string | null;
+  avatar: string | null;
+  currency: string;
+  timezone: string;
+  onboardingCompleted: boolean;
+}
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  profile: UserProfile | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,7 +30,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      const response = await userApi.getMe();
+      if (response.data?.data) {
+        setProfile(response.data.data);
+      }
+    } catch {
+      // Profile fetch failed - user may not exist yet
+      setProfile(null);
+    }
+  }, []);
 
   useEffect(() => {
     // Get initial session
@@ -25,6 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      if (session?.user) {
+        fetchProfile();
+      }
     });
 
     // Listen for auth changes
@@ -32,10 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      if (session?.user) {
+        fetchProfile();
+      } else {
+        setProfile(null);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchProfile]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -67,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle }}>
+    <AuthContext.Provider value={{ user, session, loading, profile, signIn, signUp, signOut, signInWithGoogle, refreshProfile: fetchProfile }}>
       {children}
     </AuthContext.Provider>
   );
@@ -83,14 +117,14 @@ export function useAuth() {
 
 // Compatibility hooks for components expecting Clerk-like API
 export function useUser() {
-  const { user, loading } = useAuth();
+  const { user, loading, profile } = useAuth();
   return {
     user: user ? {
       id: user.id,
-      fullName: user.user_metadata?.full_name || user.email?.split('@')[0],
-      firstName: user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0],
+      fullName: profile?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
+      firstName: (profile?.name || user.user_metadata?.full_name)?.split(' ')[0] || user.email?.split('@')[0],
       primaryEmailAddress: { emailAddress: user.email },
-      imageUrl: user.user_metadata?.avatar_url,
+      imageUrl: profile?.avatar || user.user_metadata?.avatar_url,
     } : null,
     isLoaded: !loading,
     isSignedIn: !!user,

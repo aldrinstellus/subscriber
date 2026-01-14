@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Environment files (security)
+.env
+.env.*
+apps/*/.env*
+
+# Database files
+*.db
+*.sqlite
+prisma/*.db*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Testing artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Vercel
+.vercel/
+
+# Lock files (large)
+pnpm-lock.yaml
+
+# OS files
+.DS_Store
+Thumbs.db

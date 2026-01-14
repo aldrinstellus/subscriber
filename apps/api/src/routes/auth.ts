@@ -51,7 +51,7 @@ authRouter.post('/gmail/url', authenticate, async (req: AuthRequest, res: Respon
 
 // Gmail OAuth callback (public - handles Google redirect)
 authRouter.get('/gmail/callback', async (req: Request, res: Response) => {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5175';
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   try {
     const { code, state } = req.query;
     if (!code || typeof code !== 'string') throw new Error('No code');
@@ -94,7 +94,7 @@ authRouter.post('/outlook/url', authenticate, async (req: AuthRequest, res: Resp
 
 // Outlook OAuth callback (public - handles Microsoft redirect)
 authRouter.get('/outlook/callback', async (req: Request, res: Response) => {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5175';
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   try {
     const { code, state } = req.query;
     if (!code || typeof code !== 'string') throw new Error('No code');
